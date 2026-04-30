@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "temple-admin-service"
     environment: str = "dev"
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/temple_admin"
+    database_url: str = "sqlite:///./temple_admin.db"
     registration_service_url: str = "http://localhost:8002"
     identity_service_url: str = "http://localhost:8001"
 
@@ -20,4 +20,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
