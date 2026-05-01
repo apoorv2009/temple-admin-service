@@ -64,3 +64,51 @@ class TempleDetailResponse(BaseModel):
 class ActiveTempleListResponse(BaseModel):
     items: list[TempleResponse]
     phase: str = "temple_onboarding"
+
+
+class TempleNewsFeedItemResponse(BaseModel):
+    news_item_id: str
+    temple_id: str
+    temple_name: str
+    headline: str
+    summary: str
+    published_at: str
+    phase: str = "temple_content"
+
+
+class TempleNewsFeedListResponse(BaseModel):
+    items: list[TempleNewsFeedItemResponse]
+    phase: str = "temple_content"
+
+
+class TempleWallOfFameItemResponse(BaseModel):
+    fame_item_id: str
+    temple_id: str
+    temple_name: str
+    title: str
+    honoree_name: str
+    note: str
+    created_at: str
+    phase: str = "temple_content"
+
+
+class TempleWallOfFameListResponse(BaseModel):
+    items: list[TempleWallOfFameItemResponse]
+    phase: str = "temple_content"
+
+
+class ShantidharaSlotResponse(BaseModel):
+    slot_id: str
+    temple_id: str
+    temple_name: str
+    slot_date: str
+    slot_label: str
+    note: str
+    amount_label: str
+    status: Literal["available", "booked", "blocked"]
+    phase: str = "temple_booking"
+
+
+class ShantidharaSlotListResponse(BaseModel):
+    items: list[ShantidharaSlotResponse]
+    phase: str = "temple_booking"

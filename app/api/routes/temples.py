@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
+from datetime import date
+
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.config import get_settings
 from app.api.routes._http import forward_json
@@ -6,11 +8,14 @@ from app.schemas.temple import (
     ActiveTempleListResponse,
     BulkTempleAdminCreateRequest,
     BulkTempleAdminCreateResponse,
+    ShantidharaSlotListResponse,
     LeadershipMemberCreateRequest,
     LeadershipMemberResponse,
+    TempleNewsFeedListResponse,
     TempleCreateRequest,
     TempleDetailResponse,
     TempleResponse,
+    TempleWallOfFameListResponse,
 )
 from app.services.temples import temple_store
 
@@ -102,6 +107,33 @@ async def bulk_add_temple_admins(
 @router.post("/{temple_id}/activate", response_model=TempleResponse)
 async def activate_temple(temple_id: str) -> TempleResponse:
     response = temple_store.activate_temple(temple_id)
+    if response is None:
+        raise HTTPException(status_code=404, detail="Temple not found")
+    return response
+
+
+@router.get("/{temple_id}/news-feed", response_model=TempleNewsFeedListResponse)
+async def list_temple_news_feed(temple_id: str) -> TempleNewsFeedListResponse:
+    response = temple_store.list_news_feed(temple_id)
+    if response is None:
+        raise HTTPException(status_code=404, detail="Temple not found")
+    return response
+
+
+@router.get("/{temple_id}/wall-of-fame", response_model=TempleWallOfFameListResponse)
+async def list_temple_wall_of_fame(temple_id: str) -> TempleWallOfFameListResponse:
+    response = temple_store.list_wall_of_fame(temple_id)
+    if response is None:
+        raise HTTPException(status_code=404, detail="Temple not found")
+    return response
+
+
+@router.get("/{temple_id}/shantidhara/slots", response_model=ShantidharaSlotListResponse)
+async def list_shantidhara_slots(
+    temple_id: str,
+    slot_date: date | None = Query(default=None),
+) -> ShantidharaSlotListResponse:
+    response = temple_store.list_shantidhara_slots(temple_id, slot_date=slot_date)
     if response is None:
         raise HTTPException(status_code=404, detail="Temple not found")
     return response

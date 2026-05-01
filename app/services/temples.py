@@ -1,17 +1,31 @@
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import func, select
 
 from app.core.database import SessionLocal
-from app.models import LeadershipMember, Temple, TempleAdmin
+from app.models import (
+    LeadershipMember,
+    ShantidharaSlot,
+    Temple,
+    TempleAdmin,
+    TempleNewsFeedItem,
+    TempleWallOfFameItem,
+)
 from app.schemas.temple import (
     BulkTempleAdminCreateRequest,
     BulkTempleAdminCreateResponse,
+    ShantidharaSlotListResponse,
+    ShantidharaSlotResponse,
     LeadershipMemberCreateRequest,
     LeadershipMemberResponse,
+    TempleNewsFeedItemResponse,
+    TempleNewsFeedListResponse,
     TempleCreateRequest,
     TempleDetailResponse,
     TempleResponse,
+    TempleWallOfFameItemResponse,
+    TempleWallOfFameListResponse,
 )
 
 
@@ -149,6 +163,7 @@ class TempleStore:
                 return None
 
             temple.status = "active"
+            self._ensure_temple_experience_seed(session, temple)
             session.commit()
             session.refresh(temple)
 
@@ -200,6 +215,93 @@ class TempleStore:
                 for temple in temples
             ]
 
+    def list_news_feed(self, temple_id: str) -> TempleNewsFeedListResponse | None:
+        with SessionLocal() as session:
+            temple = session.scalar(select(Temple).where(Temple.temple_id == temple_id))
+            if temple is None:
+                return None
+
+            items = session.scalars(
+                select(TempleNewsFeedItem)
+                .where(TempleNewsFeedItem.temple_id == temple_id)
+                .order_by(TempleNewsFeedItem.published_at.desc()),
+            ).all()
+            return TempleNewsFeedListResponse(
+                items=[
+                    TempleNewsFeedItemResponse(
+                        news_item_id=item.news_item_id,
+                        temple_id=item.temple_id,
+                        temple_name=temple.temple_name,
+                        headline=item.headline,
+                        summary=item.summary,
+                        published_at=item.published_at.isoformat(),
+                    )
+                    for item in items
+                ],
+            )
+
+    def list_wall_of_fame(self, temple_id: str) -> TempleWallOfFameListResponse | None:
+        with SessionLocal() as session:
+            temple = session.scalar(select(Temple).where(Temple.temple_id == temple_id))
+            if temple is None:
+                return None
+
+            items = session.scalars(
+                select(TempleWallOfFameItem)
+                .where(TempleWallOfFameItem.temple_id == temple_id)
+                .order_by(TempleWallOfFameItem.created_at.desc()),
+            ).all()
+            return TempleWallOfFameListResponse(
+                items=[
+                    TempleWallOfFameItemResponse(
+                        fame_item_id=item.fame_item_id,
+                        temple_id=item.temple_id,
+                        temple_name=temple.temple_name,
+                        title=item.title,
+                        honoree_name=item.honoree_name,
+                        note=item.note,
+                        created_at=item.created_at.isoformat(),
+                    )
+                    for item in items
+                ],
+            )
+
+    def list_shantidhara_slots(
+        self,
+        temple_id: str,
+        *,
+        slot_date: date | None = None,
+    ) -> ShantidharaSlotListResponse | None:
+        with SessionLocal() as session:
+            temple = session.scalar(select(Temple).where(Temple.temple_id == temple_id))
+            if temple is None:
+                return None
+
+            query = (
+                select(ShantidharaSlot)
+                .where(ShantidharaSlot.temple_id == temple_id)
+                .order_by(ShantidharaSlot.slot_date.asc(), ShantidharaSlot.slot_label.asc())
+            )
+            if slot_date is not None:
+                query = query.where(ShantidharaSlot.slot_date == slot_date)
+
+            items = session.scalars(query).all()
+            return ShantidharaSlotListResponse(
+                items=[
+                    ShantidharaSlotResponse(
+                        slot_id=item.slot_id,
+                        temple_id=item.temple_id,
+                        temple_name=temple.temple_name,
+                        slot_date=item.slot_date.isoformat(),
+                        slot_label=item.slot_label,
+                        note=item.note,
+                        amount_label=item.amount_label,
+                        status=item.status,  # type: ignore[arg-type]
+                    )
+                    for item in items
+                ],
+            )
+
     @staticmethod
     def _format_temple_id(row_id: int) -> str:
         return f"TMP-{row_id:04d}"
@@ -211,6 +313,101 @@ class TempleStore:
     @staticmethod
     def _format_admin_id(row_id: int) -> str:
         return f"ADM-{row_id:05d}"
+
+    @staticmethod
+    def _format_news_item_id(row_id: int) -> str:
+        return f"NEWS-{row_id:05d}"
+
+    @staticmethod
+    def _format_fame_item_id(row_id: int) -> str:
+        return f"FAME-{row_id:05d}"
+
+    @staticmethod
+    def _format_slot_id(row_id: int) -> str:
+        return f"SLOT-{row_id:05d}"
+
+    def _ensure_temple_experience_seed(self, session, temple: Temple) -> None:
+        has_news = session.scalar(
+            select(func.count(TempleNewsFeedItem.id)).where(TempleNewsFeedItem.temple_id == temple.temple_id),
+        ) or 0
+        has_fame = session.scalar(
+            select(func.count(TempleWallOfFameItem.id)).where(TempleWallOfFameItem.temple_id == temple.temple_id),
+        ) or 0
+        has_slots = session.scalar(
+            select(func.count(ShantidharaSlot.id)).where(ShantidharaSlot.temple_id == temple.temple_id),
+        ) or 0
+
+        if int(has_news) == 0:
+            news_seed = [
+                (
+                    f"{temple.temple_name} sangh update",
+                    f"Daily announcements for {temple.temple_name} will appear here for approved members.",
+                ),
+                (
+                    "Upcoming temple program",
+                    f"Program and seva notices for {temple.temple_location} will be listed in this feed.",
+                ),
+            ]
+            for headline, summary in news_seed:
+                item = TempleNewsFeedItem(
+                    news_item_id="pending",
+                    temple_id=temple.temple_id,
+                    headline=headline,
+                    summary=summary,
+                    published_at=datetime.utcnow(),
+                )
+                session.add(item)
+                session.flush()
+                item.news_item_id = self._format_news_item_id(item.id)
+
+        if int(has_fame) == 0:
+            fame_seed = [
+                (
+                    "Seva recognition",
+                    "Sangh members",
+                    f"Recognition highlights from {temple.temple_name} will be published here.",
+                ),
+                (
+                    "Temple milestone",
+                    "Community contribution",
+                    "Major temple milestones and acknowledgements will appear on the wall of fame.",
+                ),
+            ]
+            for title, honoree_name, note in fame_seed:
+                item = TempleWallOfFameItem(
+                    fame_item_id="pending",
+                    temple_id=temple.temple_id,
+                    title=title,
+                    honoree_name=honoree_name,
+                    note=note,
+                    created_at=datetime.utcnow(),
+                )
+                session.add(item)
+                session.flush()
+                item.fame_item_id = self._format_fame_item_id(item.id)
+
+        if int(has_slots) == 0:
+            slot_templates = [
+                ("06:30 AM", "Pratahkal Shantidhara", "Rs. 1,100"),
+                ("08:15 AM", "Parivar booking", "Rs. 2,100"),
+                ("10:00 AM", "Samuhik slot", "Rs. 1,500"),
+            ]
+            start_date = date.today()
+            for offset in range(0, 14):
+                slot_day = start_date + timedelta(days=offset)
+                for label, note, amount_label in slot_templates:
+                    slot = ShantidharaSlot(
+                        slot_id="pending",
+                        temple_id=temple.temple_id,
+                        slot_date=slot_day,
+                        slot_label=label,
+                        note=note,
+                        amount_label=amount_label,
+                        status="available",
+                    )
+                    session.add(slot)
+                    session.flush()
+                    slot.slot_id = self._format_slot_id(slot.id)
 
 
 temple_store = TempleStore()
