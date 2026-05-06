@@ -19,11 +19,13 @@ from app.schemas.temple import (
     ShantidharaSlotResponse,
     LeadershipMemberCreateRequest,
     LeadershipMemberResponse,
+    TempleNewsFeedCreateRequest,
     TempleNewsFeedItemResponse,
     TempleNewsFeedListResponse,
     TempleCreateRequest,
     TempleDetailResponse,
     TempleResponse,
+    TempleWallOfFameCreateRequest,
     TempleWallOfFameItemResponse,
     TempleWallOfFameListResponse,
 )
@@ -240,6 +242,38 @@ class TempleStore:
                 ],
             )
 
+    def create_news_feed_item(
+        self,
+        temple_id: str,
+        payload: TempleNewsFeedCreateRequest,
+    ) -> TempleNewsFeedItemResponse | None:
+        with SessionLocal() as session:
+            temple = session.scalar(select(Temple).where(Temple.temple_id == temple_id))
+            if temple is None:
+                return None
+
+            item = TempleNewsFeedItem(
+                news_item_id="pending",
+                temple_id=temple_id,
+                headline=payload.headline.strip(),
+                summary=payload.summary.strip(),
+                published_at=datetime.utcnow(),
+            )
+            session.add(item)
+            session.flush()
+            item.news_item_id = self._format_news_item_id(item.id)
+            session.commit()
+            session.refresh(item)
+
+            return TempleNewsFeedItemResponse(
+                news_item_id=item.news_item_id,
+                temple_id=item.temple_id,
+                temple_name=temple.temple_name,
+                headline=item.headline,
+                summary=item.summary,
+                published_at=item.published_at.isoformat(),
+            )
+
     def list_wall_of_fame(self, temple_id: str) -> TempleWallOfFameListResponse | None:
         with SessionLocal() as session:
             temple = session.scalar(select(Temple).where(Temple.temple_id == temple_id))
@@ -264,6 +298,40 @@ class TempleStore:
                     )
                     for item in items
                 ],
+            )
+
+    def create_wall_of_fame_item(
+        self,
+        temple_id: str,
+        payload: TempleWallOfFameCreateRequest,
+    ) -> TempleWallOfFameItemResponse | None:
+        with SessionLocal() as session:
+            temple = session.scalar(select(Temple).where(Temple.temple_id == temple_id))
+            if temple is None:
+                return None
+
+            item = TempleWallOfFameItem(
+                fame_item_id="pending",
+                temple_id=temple_id,
+                title=payload.title.strip(),
+                honoree_name=payload.honoree_name.strip(),
+                note=payload.note.strip(),
+                created_at=datetime.utcnow(),
+            )
+            session.add(item)
+            session.flush()
+            item.fame_item_id = self._format_fame_item_id(item.id)
+            session.commit()
+            session.refresh(item)
+
+            return TempleWallOfFameItemResponse(
+                fame_item_id=item.fame_item_id,
+                temple_id=item.temple_id,
+                temple_name=temple.temple_name,
+                title=item.title,
+                honoree_name=item.honoree_name,
+                note=item.note,
+                created_at=item.created_at.isoformat(),
             )
 
     def list_shantidhara_slots(

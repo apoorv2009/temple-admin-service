@@ -11,10 +11,14 @@ from app.schemas.temple import (
     ShantidharaSlotListResponse,
     LeadershipMemberCreateRequest,
     LeadershipMemberResponse,
+    TempleNewsFeedCreateRequest,
     TempleNewsFeedListResponse,
+    TempleNewsFeedItemResponse,
     TempleCreateRequest,
     TempleDetailResponse,
     TempleResponse,
+    TempleWallOfFameCreateRequest,
+    TempleWallOfFameItemResponse,
     TempleWallOfFameListResponse,
 )
 from app.services.temples import temple_store
@@ -120,9 +124,31 @@ async def list_temple_news_feed(temple_id: str) -> TempleNewsFeedListResponse:
     return response
 
 
+@router.post("/{temple_id}/news-feed", response_model=TempleNewsFeedItemResponse)
+async def create_temple_news_feed(
+    temple_id: str,
+    payload: TempleNewsFeedCreateRequest,
+) -> TempleNewsFeedItemResponse:
+    response = temple_store.create_news_feed_item(temple_id, payload)
+    if response is None:
+        raise HTTPException(status_code=404, detail="Temple not found")
+    return response
+
+
 @router.get("/{temple_id}/wall-of-fame", response_model=TempleWallOfFameListResponse)
 async def list_temple_wall_of_fame(temple_id: str) -> TempleWallOfFameListResponse:
     response = temple_store.list_wall_of_fame(temple_id)
+    if response is None:
+        raise HTTPException(status_code=404, detail="Temple not found")
+    return response
+
+
+@router.post("/{temple_id}/wall-of-fame", response_model=TempleWallOfFameItemResponse)
+async def create_temple_wall_of_fame(
+    temple_id: str,
+    payload: TempleWallOfFameCreateRequest,
+) -> TempleWallOfFameItemResponse:
+    response = temple_store.create_wall_of_fame_item(temple_id, payload)
     if response is None:
         raise HTTPException(status_code=404, detail="Temple not found")
     return response

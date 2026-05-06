@@ -81,6 +81,11 @@ class TempleNewsFeedListResponse(BaseModel):
     phase: str = "temple_content"
 
 
+class TempleNewsFeedCreateRequest(BaseModel):
+    headline: str = Field(..., min_length=2, max_length=160)
+    summary: str = Field(..., min_length=2, max_length=2000)
+
+
 class TempleWallOfFameItemResponse(BaseModel):
     fame_item_id: str
     temple_id: str
@@ -95,6 +100,12 @@ class TempleWallOfFameItemResponse(BaseModel):
 class TempleWallOfFameListResponse(BaseModel):
     items: list[TempleWallOfFameItemResponse]
     phase: str = "temple_content"
+
+
+class TempleWallOfFameCreateRequest(BaseModel):
+    title: str = Field(..., min_length=2, max_length=160)
+    honoree_name: str = Field(..., min_length=2, max_length=120)
+    note: str = Field(..., min_length=2, max_length=2000)
 
 
 class ShantidharaSlotResponse(BaseModel):
